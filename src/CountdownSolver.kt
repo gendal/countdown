@@ -1,4 +1,6 @@
 import java.util.*
+import kotlin.coroutines.experimental.buildSequence
+import kotlin.math.abs
 
 fun main(args: Array<String>) {
     val (target, numbers)= determineNumbersAndTarget(args)
@@ -48,8 +50,20 @@ fun main(args: Array<String>) {
     // n1 OP1 (n2 OP2 n3), (n1 OP1 n2) OP2 n3.  AND... we are guaranteed that all permutations of n1, n2 and n3
     // will be evaluated at some point.
 
+    var closest = 6
     allNumberOrderings.forEach {
-        generateAllASTs(it, target)
+        generateAllASTs(it).forEach { value ->
+            //println("***** Sequence popped")
+            val result = value.evaluate()
+            if (result == target) {
+                println("SUCCESS!!\n    ${value} = ${target}")
+                System.exit(0)
+            }
+            if (abs(result-target) < closest) {
+                println(".. Found closest answer so far:\n    ${value} = ${result}")
+                closest = abs(result-target)
+            }
+        }
     }
     println("No solutions found")
 }
@@ -89,14 +103,14 @@ private fun determineNumbersAndTarget(args: Array<String>): Pair<Int, List<Int>>
     return Pair(target, numbers)
 }
 
-fun generateAllASTs(inputList:IntArray, target: Int): List<Value> {
+fun generateAllASTs(inputList:IntArray): Sequence<Value> = buildSequence<Value> {
     // println("generateALlASTs called with input list: ${inputList.contentToString()}")
 
     val returnValue = ArrayList<Value>()
 
     if (inputList.size == 1) {
         returnValue += Number(inputList.elementAt(0))
-        return returnValue
+        yield (returnValue.elementAt(0))
     }
 
     // If we're here, there are at least two entries in the array. We now iterate across the list,
@@ -109,8 +123,8 @@ fun generateAllASTs(inputList:IntArray, target: Int): List<Value> {
         val leftList = inputList.sliceArray(0 until i)
         val rightList = inputList.sliceArray(i until inputList.size)
 
-        val lefts = generateAllASTs(leftList, target)
-        val rights = generateAllASTs(rightList, target)
+        val lefts: Sequence<Value> = generateAllASTs(leftList)
+        val rights: Sequence<Value> = generateAllASTs(rightList)
 
         lefts.forEach { left ->
             rights.forEach { right ->
@@ -123,22 +137,23 @@ fun generateAllASTs(inputList:IntArray, target: Int): List<Value> {
 
                 newTrees.forEach { item ->
                     //println ("Evaluating ${item}. Value: ${item.evaluate()}. Target: ${target}")
-                    val value = item.evaluate()
-                    when (value) {
-                        target -> {
-                            println("Evaluating ${item}. Value: ${value}. Target: ${target}")
-                            println("  SUCCESS!!")
-                            System.exit(0)
-                        }
-                    }
-
-                    returnValue += item
+                    //val value = item.evaluate()
+                    //when (value) {
+                    //    target -> {
+                    //        println("Evaluating ${item}. Value: ${value}. Target: ${target}")
+                    //        println("  SUCCESS!!")
+                    //        //System.exit(0)
+                    //    }
+                    //}
+                    //println("Adding entry to list (input list size: ${inputList.size}")
+                    yield (item)
+                    //returnValue += item
                 }
             }
         }
     }
 
-    return returnValue
+    // return returnValue
 }
 
 fun generatePermutations(inputList:List<Int>): List<IntArray> {
