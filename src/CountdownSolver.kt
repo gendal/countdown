@@ -1,6 +1,10 @@
 import java.util.*
 import kotlin.coroutines.experimental.buildSequence
 import kotlin.math.abs
+import kotlin.math.exp
+
+// A simple (brute-force) program to solve the Countdown Numbers Game,
+// explained eg here: http://datagenetics.com/blog/august32014/index.html
 
 fun main(args: Array<String>) {
     val (target, numbers)= determineNumbersAndTarget(args)
@@ -9,19 +13,33 @@ fun main(args: Array<String>) {
     println("\nTarget: ${target}\n")
 
     // Generate all orderings of the numbers
-    // Note: this only generates lists of length n (usually 6)
-    // so this program will fail to solve problems that can only be solved by using
-    // fewer than all of them
+    // Note: this only generates lists of length n (typically 6)
+    // A fuller solution would also generate all lists of _all_ lengths.
+    // So this program will fail to solve problems that can only be solved by using
+    // fewer than all of the available numbers.
     //
     // Check: allNumberOrderings.size will be equal to the number of permutations of numbers
-    // (nPn, typically 6perm6 = 720)
-    val allNumberOrderings = generatePermutations(numbers)
+    // (nPn, typically 6P6 = 720)
 
-    // For each ordering, we now brute-force the solution, iterating through all permutations
+    val bestSolution: Value? = solveCountdownNumbersGame(numbers, target)
+
+    if (bestSolution == null) {
+        println("No solutions found")
+    } else {
+        val solution = bestSolution.evaluate()
+        if (solution == target) println("Solution: ${bestSolution} = ${target}") else
+            println("Closest answer: ${bestSolution} = ${solution} (${abs(solution-target)} away)")
+    }
+}
+
+fun solveCountdownNumbersGame(inputList: List<Int>, target: Int): Value? {
+
+    // We calculate all perms and, for each ordering, we now brute-force the solution.
+    //
     // Intuition: imagine, for a given permutation of the numbers, you insert all possible
     // combinations of +-*/ operators between
     // the numbers, such that all possible combinations of operators are tested, and such that
-    // all possible precedence positions (brackets) are tested.  We do this by constructing a
+    // all possible precedences (ie brackets) are tested.  We do this by constructing a
     // series of Abstract Syntax Trees representing all possible combinations of operators and precedences
     //
     // In other words, we construct a series of binary trees representing the expression under construction
@@ -48,55 +66,47 @@ fun main(args: Array<String>) {
     // "try every insertion point as the root of the AST" trick enabling us to be sure of trying every
     // possible bracketing.
 
-    var closest = 6 // print out any solutions we find on the way that are close to the target
-    allNumberOrderings.forEach {
+    var closest = Int.MAX_VALUE // print out any solutions we find on the way that are closer to the target than the best found so far
+    var bestExpression: Value? = null
+
+    generatePermutations(inputList).forEach {
         generateAllASTs(it).forEach { expression ->
             val result = expression.evaluate()
             if (result == target) {
-                println("\nSUCCESS\n\n${expression} = ${target}")
-                //println("Proposed Solution Valid? ${validateCountdownSolution(expression, target)}")
-                System.exit(0)
+                return expression
             }
-            if (abs(result-target) < closest) {
-                println(".. Found closest answer so far:\n    ${expression} = ${result}")
-                //println("Proposed Solution Valid? ${validateCountdownSolution(expression, target)}")
-                closest = abs(result-target) // only print one match at any given closenesses
+            if (abs(result - target) < closest) {
+                closest = abs(result - target) // only print one match at any given closenesses
+                bestExpression = expression
             }
         }
     }
-    println("No solutions found")
+    return bestExpression
 }
 
-fun generateAllASTs(inputList:IntArray): Sequence<Value> = buildSequence<Value> {
-
+fun generateAllASTs(inputList: IntArray): Sequence<Value> = buildSequence<Value> {
+    // If one entry, return it.
+    //
+    // Otherwise, there are at least two entries in the array. We now iterate across the spaces
+    // in the array, slicing it between each pair of members in turn.
+    // The two slices so formed in each step will be the
+    // left and right branches of an AST rooted at this point
+    //
+    // Example: if [1,2,3] is passed in, we will generate:
+    //   [1], [2,3] and then [1, 2], [3]
+    //
+    // And then, for each of these, we try each root operator (+-/*) then recurse until we have a full
+    // AST that can be returned (yielded) for evaluation
     if (inputList.size == 1) {
-
         yield(Number(inputList.elementAt(0)))
-
     } else {
-
-        // If we're here, there are at least two entries in the array. We now iterate across the spaces
-        // in the array, slicing it between each pair of members in turn.
-        // The two slices so formed in each step will be the
-        // left and right branches of an AST rooted at this point
-        //
-        // Example: if [1,2,3] is passed in, we will generate:
-        //   [1], [2,3] and then [1, 2], [3]
-        //
-        // And then, for each of these, we try each root operator (+-/*) then recurse until we have a full
-        // AST that can be returned (yielded) for evaluation
-
-        (1 until inputList.size).forEach { i ->
-
-            val leftList = inputList.sliceArray(0 until i)
-            val rightList = inputList.sliceArray(i until inputList.size)
-
+        (1 until inputList.size).forEach { pivot ->
+            val leftList = inputList.sliceArray(0 until pivot)
+            val rightList = inputList.sliceArray(pivot until inputList.size)
             val lefts = generateAllASTs(leftList)
             val rights = generateAllASTs(rightList)
-
             lefts.forEach { left ->
                 rights.forEach { right ->
-                    //println ("${left.toString()} : ${right.toString()}")
                     var temp: Value
                     temp = Plus(left, right); if (temp.evaluate() >= 0) yield(temp)
                     temp = Minus(left, right); if (temp.evaluate() >= 0) yield(temp)
@@ -114,7 +124,9 @@ fun generatePermutations(inputList:List<Int>): List<IntArray> {
     var currentList: IntArray
     perms.forEach { perm ->
         currentList = IntArray(inputList.size)
-        for ((count, pos) in perm.withIndex()) currentList[count] = inputList.elementAt(pos)
+        perm.withIndex().forEach { (count, pos) ->
+            currentList[count] = inputList.elementAt(pos)
+        }
         returnList += currentList
     }
     return returnList
@@ -126,9 +138,9 @@ interface Value {
     fun evaluate(): Int
 }
 
-abstract class Operator(val left:Value, val right: Value): Value
+abstract class Operator(val left:Value, val right: Value) : Value
 
-class Number(val value: Int): Value {
+class Number(val value: Int) : Value {
     override fun evaluate(): Int {
         return value
     }
@@ -137,7 +149,7 @@ class Number(val value: Int): Value {
     }
 }
 
-class Plus(left: Value, right: Value): Operator(left, right) {
+class Plus(left: Value, right: Value) : Operator(left, right) {
     override fun evaluate(): Int {
         return left.evaluate() + right.evaluate()
     }
@@ -146,7 +158,7 @@ class Plus(left: Value, right: Value): Operator(left, right) {
     }
 }
 
-class Minus(left: Value, right: Value): Operator(left, right) {
+class Minus(left: Value, right: Value) : Operator(left, right) {
     override fun evaluate(): Int {
         return left.evaluate() - right.evaluate()
     }
