@@ -10,12 +10,16 @@ class CountdownSolverKtTest {
     }
 
     lateinit var inputList: List<Int>
-    lateinit var results: List<IntArray>
+    val results: MutableList<IntArray> = mutableListOf()
+
 
     @Before
     fun setUp() {
         inputList = listOf(10,20,30,40,50,60)
-        results = generatePermutations(inputList)
+        val resultsTemp = generatePerms(inputList)
+        resultsTemp.forEach {
+            results.add(it.toIntArray())
+        }
     }
 
     @Test
