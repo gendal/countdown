@@ -1,27 +1,26 @@
 import java.util.*
 import kotlin.coroutines.experimental.buildSequence
 import kotlin.math.abs
-import kotlin.math.exp
 
-// A simple (brute-force) program to solve the Countdown Numbers Game,
-// explained eg here: http://datagenetics.com/blog/august32014/index.html
+/**
+ * A simple (brute-force) program to solve the Countdown Numbers Game.
+ * Game explained eg here: http://datagenetics.com/blog/august32014/index.html
+ */
 
-fun main(args: Array<String>) {
+fun main(args: Array<String>) { // arguments: target tiles (space separated, usually six tiles)
+
     val (target, numbers)= determineNumbersAndTarget(args)
 
-    print("The numbers are: ${numbers}")
-    println("\nTarget: ${target}\n")
+    println("The numbers are: ${numbers}")
+    println("Target: ${target}\n")
 
     // Generate all orderings of the numbers
     // Note: this only generates lists of length n (typically 6)
     // A fuller solution would also generate all lists of _all_ lengths.
     // So this program will fail to solve problems that can only be solved by using
     // fewer than all of the available numbers.
-    //
-    // Check: allNumberOrderings.size will be equal to the number of permutations of numbers
-    // (nPn, typically 6P6 = 720)
 
-    val bestSolution: Value? = solveCountdownNumbersGame(numbers, target)
+    val bestSolution = solveCountdownNumbersGame(numbers, target)
 
     if (bestSolution == null) {
         println("No solutions found")
@@ -37,10 +36,10 @@ fun solveCountdownNumbersGame(inputList: List<Int>, target: Int): Value? {
     // We calculate all perms and, for each ordering, we now brute-force the solution.
     //
     // Intuition: imagine, for a given permutation of the numbers, you insert all possible
-    // combinations of +-*/ operators between
-    // the numbers, such that all possible combinations of operators are tested, and such that
-    // all possible precedences (ie brackets) are tested.  We do this by constructing a
-    // series of Abstract Syntax Trees representing all possible combinations of operators and precedences
+    // combinations of +-*/ operators between the numbers, such that all possible combinations
+    // of operators are tested, and such that all possible precedences (ie brackets) are tested.
+    // We do this by constructing a series of Abstract Syntax Trees representing
+    // all possible combinations of operators and precedences.
     //
     // In other words, we construct a series of binary trees representing the expression under construction
     // and, to achieve all possible precedences, we do this (n-1) times, with the operator between numbers 1+2
@@ -50,6 +49,7 @@ fun solveCountdownNumbersGame(inputList: List<Int>, target: Int): Value? {
     //
     // If the six numbers (if sorted) were [1, 2, 4, 6, 25, 100] and the current
     // permutation was, say, [2, 4, 6, 25, 100, 1]
+    //
     // then generateAllASTs will start with [2] and [4, 6, 25, 100, 1],
     // inserting, in turn, +, -, *, / as the root of the generated AST, with '2'
     // hanging off the left and an AST containing 4, 6, 25, 100 and 1 off the right.
@@ -66,22 +66,39 @@ fun solveCountdownNumbersGame(inputList: List<Int>, target: Int): Value? {
     // "try every insertion point as the root of the AST" trick enabling us to be sure of trying every
     // possible bracketing.
 
-    var closest = Int.MAX_VALUE // print out any solutions we find on the way that are closer to the target than the best found so far
+    var closest = Int.MAX_VALUE // we may not find a perfect solution so keep track of best so far
     var bestExpression: Value? = null
 
-    generatePermutations(inputList).forEach {
-        generateAllASTs(it).forEach { expression ->
+    generatePerms(inputList).forEach {
+        generateAllASTs(it.toIntArray()).forEach { expression ->
             val result = expression.evaluate()
             if (result == target) {
                 return expression
             }
             if (abs(result - target) < closest) {
-                closest = abs(result - target) // only print one match at any given closenesses
+                closest = abs(result - target)
                 bestExpression = expression
             }
         }
     }
     return bestExpression
+}
+
+fun generatePerms(list: List<Int>): Sequence<List<Int>> = buildSequence<List<Int>> {
+    if (list.size == 1) yield (list) else {
+        for (i in 0 until list.size) {
+            val remainderList = list.toMutableList()
+            val newFirstElement = list.elementAt(i)
+            remainderList.removeAt(i)
+            val permsOfRemainder = generatePerms(remainderList)
+            permsOfRemainder.forEach {
+                val newList = mutableListOf(newFirstElement)
+                newList.addAll(it)
+                yield(newList)
+            }
+        }
+    }
+
 }
 
 fun generateAllASTs(inputList: IntArray): Sequence<Value> = buildSequence<Value> {
@@ -95,8 +112,9 @@ fun generateAllASTs(inputList: IntArray): Sequence<Value> = buildSequence<Value>
     // Example: if [1,2,3] is passed in, we will generate:
     //   [1], [2,3] and then [1, 2], [3]
     //
-    // And then, for each of these, we try each root operator (+-/*) then recurse until we have a full
+    // And, for each of these slices, we try each root operator (+-/*) then recurse until we have a full
     // AST that can be returned (yielded) for evaluation
+
     if (inputList.size == 1) {
         yield(Number(inputList.elementAt(0)))
     } else {
@@ -118,7 +136,9 @@ fun generateAllASTs(inputList: IntArray): Sequence<Value> = buildSequence<Value>
     }
 }
 
+/*
 fun generatePermutations(inputList:List<Int>): List<IntArray> {
+
     val (perms: List<IntArray>, _) = johnsonTrotter(inputList.size)
     val returnList = ArrayList<IntArray>()
     var currentList: IntArray
@@ -131,6 +151,7 @@ fun generatePermutations(inputList:List<Int>): List<IntArray> {
     }
     return returnList
 }
+*/
 
 fun validateCountdownSolution(proposedSolution: Value, target: Int): Boolean = (proposedSolution.evaluate()==target)
 
@@ -148,6 +169,8 @@ class Number(val value: Int) : Value {
         return "${value}"
     }
 }
+
+// TODO: Get cleverer with pretty-printing
 
 class Plus(left: Value, right: Value) : Operator(left, right) {
     override fun evaluate(): Int {
@@ -176,6 +199,7 @@ class Multiply(left: Value, right: Value) : Operator(left, right) {
     }
 }
 
+// Cheat: represent fractions and the results of division-by-zero by large negative numbers, and filter elsewhere. Hacky
 class Divide(left: Value, right: Value) : Operator(left, right) {
     override fun evaluate(): Int {
         val rightVal = right.evaluate()
@@ -231,12 +255,12 @@ fun generateNumbers(): List<Int> {
         list += 25 + random.nextInt(4) * 25
     }
     (1..smallNumbers).forEach {
+        // Note: this also doesn't fully match real gameplay, where each 'small' number appears at most twice
         list += 1 + random.nextInt(9)
     }
     return list
 }
-
-////////////////// STOLEN SHAMELESSLY FROM STACKOVERFLOW /////////////////
+////////////////// CODE BELOW THIS LINE FROM https://rosettacode.org/wiki/Permutations_by_swapping#Kotlin /////////////
 
 fun johnsonTrotter(n: Int): Pair<List<IntArray>, List<Int>> {
     val p = IntArray(n) { it }  // permutation

@@ -51,4 +51,16 @@ class CountdownSolverKtTest {
         val trivialAST: Value = Number(1)
         assert(!validateCountdownSolution(trivialAST, 2))
     }
+
+    @Test
+    fun `new permutation creator`() {
+        val testList = listOf(1, 2, 3, 4)
+        val perms = generatePerms(testList)
+        val permsList = mutableListOf<IntArray>()
+        perms.forEach {
+            permsList.add(it.toIntArray())
+        }
+        assert(permsList.size == factorial(testList.size))
+
+    }
 }
