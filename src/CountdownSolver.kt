@@ -9,10 +9,10 @@ import kotlin.math.abs
 
 fun main(args: Array<String>) { // arguments: target tiles (space separated, usually six tiles)
 
-    val (target, numbers)= determineNumbersAndTarget(args)
+    val (target, numbers) = determineNumbersAndTarget(args)
 
     println("The numbers are: ${numbers}")
-    println("Target: ${target}\n")
+    println("Target: ${target}")
 
     // Generate all orderings of the numbers
     // Note: this only generates lists of length n (typically 6)
@@ -98,7 +98,6 @@ fun generatePerms(list: List<Int>): Sequence<List<Int>> = buildSequence<List<Int
             }
         }
     }
-
 }
 
 fun generateAllASTs(inputList: IntArray): Sequence<Value> = buildSequence<Value> {
